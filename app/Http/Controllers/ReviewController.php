@@ -1,0 +1,31 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Requests\SaveReviewRequest;
+use App\Models\Eatery;
+use App\Models\Review;
+use Illuminate\Http\RedirectResponse;
+
+class ReviewController extends Controller
+{
+    public function store(SaveReviewRequest $request, Eatery $eatery): RedirectResponse
+    {
+        $eatery->reviews()->create($request->validated());
+
+        return redirect()
+            ->route('eateries.show', $eatery)
+            ->with('status', 'Review added.');
+    }
+
+    public function destroy(Review $review): RedirectResponse
+    {
+        $review->load('eatery');
+        $eatery = $review->eatery;
+        $review->delete();
+
+        return redirect()
+            ->route('eateries.show', $eatery)
+            ->with('status', 'Review deleted.');
+    }
+}
