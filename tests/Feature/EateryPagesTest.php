@@ -210,6 +210,9 @@ it('shows home totals and the three highest-rated reviewed eateries', function (
     $response->assertViewHas('eateryCount', 4)
         ->assertViewHas('districtCount', 2)
         ->assertViewHas('reviewCount', 3)
+        ->assertSee(route('home'), false)
+        ->assertSee('Home')
+        ->assertSee('Add Eatery')
         ->assertSee('Top Rated')
         ->assertSee('Top Table')
         ->assertSee('Second Spoon')
@@ -447,8 +450,10 @@ it('binds eateries by slug and stores and deletes reviews through named routes',
         'rating' => 5,
     ]);
 
-    $this->delete(route('reviews.destroy', $review))
-        ->assertRedirect(route('eateries.show', $eatery));
+    $this->followingRedirects()
+        ->delete(route('reviews.destroy', $review))
+        ->assertOk()
+        ->assertSee('Review deleted.');
 
     $this->assertDatabaseMissing('reviews', [
         'id' => $review->id,

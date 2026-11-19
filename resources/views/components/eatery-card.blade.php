@@ -1,3 +1,5 @@
+@props(['eatery'])
+
 @php
     $priceLabel = match ($eatery->price_range) {
         'budget' => '₱',
@@ -7,7 +9,7 @@
     };
 @endphp
 
-<article class="flex h-full flex-col gap-4 rounded-xl border border-stone-200 bg-white p-5 shadow-sm dark:border-stone-800 dark:bg-stone-900">
+<article {{ $attributes->merge(['class' => 'flex h-full flex-col gap-4 rounded-xl border border-stone-200 bg-white p-5 shadow-sm dark:border-stone-800 dark:bg-stone-900']) }}>
     <div class="space-y-2">
         <div class="flex flex-wrap items-center justify-between gap-2">
             <h2 class="text-lg font-semibold">
@@ -40,12 +42,10 @@
 
     <div class="mt-auto flex flex-wrap gap-x-4 gap-y-1 border-t border-stone-100 pt-3 text-sm text-stone-600 dark:border-stone-800 dark:text-stone-300">
         <span>{{ $eatery->dishes_count }} dishes</span>
-        <span>
-            @if ($eatery->reviews_count > 0)
-                {{ number_format((float) $eatery->reviews_avg_rating, 1) }} ★ ({{ $eatery->reviews_count }} {{ $eatery->reviews_count === 1 ? 'review' : 'reviews' }})
-            @else
-                No reviews yet.
-            @endif
-        </span>
+        @if ($eatery->reviews_count > 0)
+            <x-rating :rating="$eatery->reviews_avg_rating" :count="$eatery->reviews_count" />
+        @else
+            <span>No reviews yet.</span>
+        @endif
     </div>
 </article>

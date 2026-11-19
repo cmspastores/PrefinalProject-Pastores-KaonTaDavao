@@ -23,7 +23,7 @@
         @else
             <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
                 @foreach ($district->eateries as $eatery)
-                    @include('eateries._card', ['eatery' => $eatery])
+                    <x-eatery-card :eatery="$eatery" />
                 @endforeach
             </div>
         @endif

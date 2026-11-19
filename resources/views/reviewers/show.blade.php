@@ -26,7 +26,7 @@
                             <span class="font-normal text-stone-500">in</span>
                             <a class="font-normal hover:text-emerald-700 dark:hover:text-emerald-300" href="{{ route('districts.show', $review->eatery->district) }}">{{ $review->eatery->district->name }}</a>
                         </h2>
-                        <span class="text-sm text-amber-700 dark:text-amber-300">{{ $review->rating }} / 5</span>
+                        <x-rating :rating="$review->rating" class="text-sm text-amber-700 dark:text-amber-300" />
                     </div>
                     <p class="text-stone-700 dark:text-stone-200">{{ $review->body }}</p>
                 </article>

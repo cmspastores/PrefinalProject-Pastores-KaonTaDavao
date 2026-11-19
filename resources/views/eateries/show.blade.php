@@ -95,7 +95,10 @@
                 <article class="rounded-lg border border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-stone-900">
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <a class="font-semibold hover:text-emerald-700 dark:hover:text-emerald-300" href="{{ route('reviewers.show', $review->user) }}">{{ $review->user->name }}</a>
-                        <span class="text-sm text-amber-700 dark:text-amber-300">{{ $review->rating }} / 5 · <time datetime="{{ $review->created_at->toDateString() }}">{{ $review->created_at->toFormattedDateString() }}</time></span>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <x-rating :rating="$review->rating" class="text-sm text-amber-700 dark:text-amber-300" />
+                            <time class="text-sm text-stone-600 dark:text-stone-300" datetime="{{ $review->created_at->toDateString() }}">{{ $review->created_at->toFormattedDateString() }}</time>
+                        </div>
                     </div>
                     <p class="mt-3 text-stone-700 dark:text-stone-200">{{ $review->body }}</p>
                     <form class="mt-3" method="POST" action="{{ route('reviews.destroy', $review) }}">
