@@ -25,11 +25,12 @@ it('renders eager-loaded relationship names and aggregates on browse pages', fun
     $eatery->dishes()->create([
         'name' => 'Grilled Fish',
         'price' => 12.50,
+        'is_bestseller' => true,
     ]);
 
     $eatery->permit()->create([
         'permit_no' => 'PERMIT-01',
-        'expires_on' => '2027-01-15',
+        'expires_on' => '2020-01-15',
     ]);
 
     $feature = Feature::create([
@@ -54,10 +55,19 @@ it('renders eager-loaded relationship names and aggregates on browse pages', fun
         'password' => 'password',
     ]);
 
-    $eatery->reviews()->createMany([
-        ['user_id' => $reviewer->id, 'rating' => 5, 'body' => 'Excellent food.'],
-        ['user_id' => $reviewer->id, 'rating' => 3, 'body' => 'Good food.'],
+    $olderReview = $eatery->reviews()->create([
+        'user_id' => $reviewer->id,
+        'rating' => 5,
+        'body' => 'Excellent food.',
     ]);
+    $olderReview->forceFill(['created_at' => '2025-01-15 12:00:00'])->save();
+
+    $newerReview = $eatery->reviews()->create([
+        'user_id' => $reviewer->id,
+        'rating' => 3,
+        'body' => 'Good food.',
+    ]);
+    $newerReview->forceFill(['created_at' => '2026-01-15 12:00:00'])->save();
 
     $wasPreventingLazyLoading = Model::preventsLazyLoading();
     Model::preventLazyLoading(true);
@@ -69,7 +79,9 @@ it('renders eager-loaded relationship names and aggregates on browse pages', fun
             ->assertDontSee('Northside Cafe')
             ->assertSee('Northside')
             ->assertSee('Outdoor seating')
-            ->assertSee('4.0 / 5');
+            ->assertSee('₱₱')
+            ->assertSee('4.0 ★ (2 reviews)')
+            ->assertSee(route('eateries.index', ['feature' => $feature->name]), false);
 
         $this->get(route('eateries.index'))
             ->assertOk()
@@ -85,23 +97,71 @@ it('renders eager-loaded relationship names and aggregates on browse pages', fun
             ->assertOk()
             ->assertSee('Harbor Kitchen')
             ->assertSee('Northside Cafe')
-            ->assertSee('2 reviews');
+            ->assertSee('2 reviews in Northside');
 
         $this->get(route('eateries.show', $eatery->slug))
             ->assertOk()
             ->assertSee('Grilled Fish')
+            ->assertSee('₱12.50')
+            ->assertSee('Bestseller')
+            ->assertSee('Permit expired')
             ->assertSee('PERMIT', false)
-            ->assertSee('Sam Reviewer');
+            ->assertSee('Sam Reviewer')
+            ->assertSee(route('reviewers.show', $reviewer), false)
+            ->assertSee('Delete review')
+            ->assertSee('Jan 15, 2026');
+
+        $eateryPage = $this->get(route('eateries.show', $eatery->slug))->getContent();
+
+        expect(strpos($eateryPage, 'Good food.'))->toBeLessThan(strpos($eateryPage, 'Excellent food.'));
 
         $this->get(route('reviewers.show', $reviewer))
             ->assertOk()
             ->assertSee('Harbor Kitchen')
             ->assertSee('Northside')
-            ->assertSee('2 reviews')
+            ->assertSee('2 reviews written')
             ->assertSee('4.0 / 5');
+
+        $reviewerPage = $this->get(route('reviewers.show', $reviewer))->getContent();
+
+        expect(strpos($reviewerPage, 'Good food.'))->toBeLessThan(strpos($reviewerPage, 'Excellent food.'));
     } finally {
         Model::preventLazyLoading($wasPreventingLazyLoading);
     }
+});
+
+it('shows a closed badge and pauses reviews for closed eateries', function () {
+    $district = District::create([
+        'name' => 'Southside',
+    ]);
+    $eatery = $district->eateries()->create([
+        'name' => 'Closed Kitchen',
+        'slug' => 'closed-kitchen',
+        'address' => '4 South Road',
+        'price_range' => 'budget',
+        'is_open' => false,
+    ]);
+    $reviewer = User::create([
+        'name' => 'Review Writer',
+        'email' => 'writer@example.com',
+        'password' => 'password',
+    ]);
+
+    $eatery->reviews()->create([
+        'user_id' => $reviewer->id,
+        'rating' => 4,
+        'body' => 'A past review.',
+    ]);
+
+    $this->get(route('eateries.index'))
+        ->assertOk()
+        ->assertSee('Closed');
+
+    $this->get(route('eateries.show', $eatery))
+        ->assertOk()
+        ->assertSee('This eatery is closed. Reviews are paused.')
+        ->assertDontSee('Submit review')
+        ->assertDontSee('name="body"', false);
 });
 
 it('shows home totals and the three highest-rated reviewed eateries', function () {

@@ -8,13 +8,14 @@
             <a class="text-sm text-emerald-700 hover:underline dark:text-emerald-300" href="{{ route('districts.index') }}">← All districts</a>
             <h1 class="text-3xl font-bold">{{ $district->name }}</h1>
             <p class="text-stone-600 dark:text-stone-300">
-                {{ $district->eateries_count }} eateries · {{ $district->reviews_count }} reviews ·
+                {{ $district->eateries_count }} eateries ·
                 @if ($district->reviews_count > 0)
                     {{ number_format((float) $district->reviews_avg_rating, 1) }} / 5 average rating
                 @else
                     No ratings yet
                 @endif
             </p>
+            <p class="text-stone-600 dark:text-stone-300">{{ $district->reviews_count }} reviews in {{ $district->name }}</p>
         </div>
 
         @if ($district->eateries->isEmpty())

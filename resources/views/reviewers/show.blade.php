@@ -8,7 +8,7 @@
             <a class="text-sm text-emerald-700 hover:underline dark:text-emerald-300" href="{{ route('eateries.index') }}">← All eateries</a>
             <h1 class="text-3xl font-bold">{{ $reviewer->name }}</h1>
             <p class="text-stone-600 dark:text-stone-300">
-                {{ $reviewer->reviews_count }} reviews ·
+                {{ $reviewer->reviews_count }} reviews written ·
                 @if ($reviewer->reviews_count > 0)
                     {{ number_format((float) $reviewer->reviews_avg_rating, 1) }} / 5 average rating
                 @else

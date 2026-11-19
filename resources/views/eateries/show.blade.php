@@ -3,6 +3,15 @@
 @section('title', $eatery->name.' | Davao Eats')
 
 @section('content')
+    @php
+        $priceLabel = match ($eatery->price_range) {
+            'budget' => '₱',
+            'mid' => '₱₱',
+            'splurge' => '₱₱₱',
+            default => $eatery->price_range,
+        };
+    @endphp
+
     <article class="space-y-8">
         <header class="space-y-4">
             <a class="text-sm text-emerald-700 hover:underline dark:text-emerald-300" href="{{ route('eateries.index') }}">← All eateries</a>
@@ -11,7 +20,7 @@
                     <p class="text-sm font-medium text-stone-600 dark:text-stone-300">
                         <a class="hover:underline" href="{{ route('districts.show', $eatery->district) }}">{{ $eatery->district->name }}</a>
                         <span aria-hidden="true">·</span>
-                        <span class="capitalize">{{ $eatery->price_range }}</span>
+                        <span>{{ $priceLabel }}</span>
                         <span aria-hidden="true">·</span>
                         {{ $eatery->is_open ? 'Open' : 'Closed' }}
                     </p>
@@ -32,7 +41,7 @@
             </div>
             <div class="flex flex-wrap gap-2">
                 @foreach ($eatery->features as $feature)
-                    <a class="rounded-full bg-emerald-50 px-3 py-1 text-sm text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" href="{{ route('eateries.index', ['feature' => $feature->id]) }}">{{ $feature->name }}</a>
+                    <a class="rounded-full bg-emerald-50 px-3 py-1 text-sm text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" href="{{ route('eateries.index', ['feature' => $feature->name]) }}">{{ $feature->name }}</a>
                 @endforeach
             </div>
             <p class="text-sm text-stone-600 dark:text-stone-300">
@@ -57,7 +66,7 @@
                                 <span class="text-sm text-amber-700 dark:text-amber-300">Bestseller</span>
                             @endif
                         </div>
-                        <span>{{ number_format((float) $dish->price, 2) }}</span>
+                        <span>₱{{ number_format((float) $dish->price, 2) }}</span>
                     </article>
                 @empty
                     <p class="rounded-lg border border-dashed border-stone-300 p-4 text-stone-600 dark:border-stone-700 dark:text-stone-300">No dishes listed yet.</p>
@@ -70,6 +79,9 @@
                     @if ($eatery->permit)
                         <p><span class="font-medium">Permit:</span> {{ $eatery->permit->permit_no }}</p>
                         <p class="mt-2 text-sm text-stone-600 dark:text-stone-300">Expires {{ $eatery->permit->expires_on->toFormattedDateString() }}</p>
+                        @if ($eatery->permit->expires_on->lt(today()))
+                            <p class="mt-2 text-sm font-semibold text-red-700 dark:text-red-300">Permit expired</p>
+                        @endif
                     @else
                         <p class="text-stone-600 dark:text-stone-300">No permit details listed.</p>
                     @endif
@@ -83,7 +95,7 @@
                 <article class="rounded-lg border border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-stone-900">
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <a class="font-semibold hover:text-emerald-700 dark:hover:text-emerald-300" href="{{ route('reviewers.show', $review->user) }}">{{ $review->user->name }}</a>
-                        <span class="text-sm text-amber-700 dark:text-amber-300">{{ $review->rating }} / 5</span>
+                        <span class="text-sm text-amber-700 dark:text-amber-300">{{ $review->rating }} / 5 · <time datetime="{{ $review->created_at->toDateString() }}">{{ $review->created_at->toFormattedDateString() }}</time></span>
                     </div>
                     <p class="mt-3 text-stone-700 dark:text-stone-200">{{ $review->body }}</p>
                     <form class="mt-3" method="POST" action="{{ route('reviews.destroy', $review) }}">
@@ -97,36 +109,40 @@
             @endforelse
         </section>
 
-        <section class="space-y-4 border-t border-stone-200 pt-6 dark:border-stone-800">
-            <h2 class="text-xl font-semibold">Add a review</h2>
-            @if ($reviewers->isEmpty())
-                <p class="text-stone-600 dark:text-stone-300">A reviewer account is needed before a review can be added.</p>
-            @else
-                <form class="grid gap-4 rounded-lg border border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-stone-900" method="POST" action="{{ route('eateries.reviews.store', $eatery) }}">
-                    @csrf
-                    <label class="grid gap-1 text-sm font-medium">
-                        <span>Reviewer</span>
-                        <select class="rounded-lg border border-stone-300 bg-transparent px-3 py-2 dark:border-stone-700" name="user_id" required>
-                            @foreach ($reviewers as $reviewer)
-                                <option value="{{ $reviewer->id }}" @selected(old('user_id') == $reviewer->id)>{{ $reviewer->name }}</option>
-                            @endforeach
-                        </select>
-                    </label>
-                    <label class="grid gap-1 text-sm font-medium">
-                        <span>Rating</span>
-                        <select class="rounded-lg border border-stone-300 bg-transparent px-3 py-2 dark:border-stone-700" name="rating" required>
-                            @foreach (range(1, 5) as $rating)
-                                <option value="{{ $rating }}" @selected(old('rating', 5) == $rating)>{{ $rating }} / 5</option>
-                            @endforeach
-                        </select>
-                    </label>
-                    <label class="grid gap-1 text-sm font-medium">
-                        <span>Review</span>
-                        <textarea class="rounded-lg border border-stone-300 bg-transparent px-3 py-2 dark:border-stone-700" name="body" rows="4" required>{{ old('body') }}</textarea>
-                    </label>
-                    <button class="justify-self-start rounded-lg bg-emerald-700 px-5 py-2.5 font-semibold text-white hover:bg-emerald-800" type="submit">Submit review</button>
-                </form>
-            @endif
-        </section>
+        @if ($eatery->is_open)
+            <section class="space-y-4 border-t border-stone-200 pt-6 dark:border-stone-800">
+                <h2 class="text-xl font-semibold">Add a review</h2>
+                @if ($reviewers->isEmpty())
+                    <p class="text-stone-600 dark:text-stone-300">A reviewer account is needed before a review can be added.</p>
+                @else
+                    <form class="grid gap-4 rounded-lg border border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-stone-900" method="POST" action="{{ route('eateries.reviews.store', $eatery) }}">
+                        @csrf
+                        <label class="grid gap-1 text-sm font-medium">
+                            <span>Reviewer</span>
+                            <select class="rounded-lg border border-stone-300 bg-transparent px-3 py-2 dark:border-stone-700" name="user_id" required>
+                                @foreach ($reviewers as $reviewer)
+                                    <option value="{{ $reviewer->id }}" @selected(old('user_id') == $reviewer->id)>{{ $reviewer->name }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <label class="grid gap-1 text-sm font-medium">
+                            <span>Rating</span>
+                            <select class="rounded-lg border border-stone-300 bg-transparent px-3 py-2 dark:border-stone-700" name="rating" required>
+                                @foreach (range(1, 5) as $rating)
+                                    <option value="{{ $rating }}" @selected(old('rating', 5) == $rating)>{{ $rating }} / 5</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <label class="grid gap-1 text-sm font-medium">
+                            <span>Review</span>
+                            <textarea class="rounded-lg border border-stone-300 bg-transparent px-3 py-2 dark:border-stone-700" name="body" rows="4" required>{{ old('body') }}</textarea>
+                        </label>
+                        <button class="justify-self-start rounded-lg bg-emerald-700 px-5 py-2.5 font-semibold text-white hover:bg-emerald-800" type="submit">Submit review</button>
+                    </form>
+                @endif
+            </section>
+        @else
+            <p>This eatery is closed. Reviews are paused.</p>
+        @endif
     </article>
 @endsection

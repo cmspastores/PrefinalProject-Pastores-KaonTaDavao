@@ -101,7 +101,11 @@ class EateryController extends Controller
             'dishes' => fn (HasMany $query) => $query->orderBy('name'),
             'features',
             'permit',
-            'reviews.user',
+            'reviews' => function (HasMany $query): void {
+                $query->with('user')
+                    ->orderByDesc('created_at')
+                    ->orderByDesc('id');
+            },
         ])->loadCount('reviews')->loadAvg('reviews', 'rating');
 
         return view('eateries.show', [
