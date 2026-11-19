@@ -25,10 +25,6 @@
                     <input class="w-full rounded-lg border border-stone-300 bg-transparent px-3 py-2 dark:border-stone-700" name="name" maxlength="100" required value="{{ old('name', $eatery?->name) }}">
                 </label>
                 <label class="space-y-1 text-sm font-medium">
-                    <span>Slug</span>
-                    <input class="w-full rounded-lg border border-stone-300 bg-transparent px-3 py-2 dark:border-stone-700" name="slug" required value="{{ old('slug', $eatery?->slug) }}">
-                </label>
-                <label class="space-y-1 text-sm font-medium">
                     <span>District</span>
                     <select class="w-full rounded-lg border border-stone-300 bg-transparent px-3 py-2 dark:border-stone-700" name="district_id" required>
                         @foreach ($districts as $district)
@@ -53,7 +49,7 @@
                 </label>
                 <label class="space-y-1 text-sm font-medium sm:col-span-2">
                     <span>Specialty (optional)</span>
-                    <input class="w-full rounded-lg border border-stone-300 bg-transparent px-3 py-2 dark:border-stone-700" name="specialty" value="{{ old('specialty', $eatery?->specialty) }}">
+                    <input class="w-full rounded-lg border border-stone-300 bg-transparent px-3 py-2 dark:border-stone-700" name="specialty" maxlength="100" value="{{ old('specialty', $eatery?->specialty) }}">
                 </label>
             </div>
 
@@ -78,14 +74,14 @@
             </fieldset>
 
             <fieldset class="grid gap-5 border-t border-stone-200 pt-5 sm:grid-cols-2 dark:border-stone-800">
-                <legend class="px-1 text-sm font-semibold">Permit (optional)</legend>
+                <legend class="px-1 text-sm font-semibold">Permit</legend>
                 <label class="space-y-1 text-sm font-medium">
                     <span>Permit number</span>
-                    <input class="w-full rounded-lg border border-stone-300 bg-transparent px-3 py-2 dark:border-stone-700" name="permit_no" value="{{ old('permit_no', $eatery?->permit?->permit_no) }}">
+                    <input class="w-full rounded-lg border border-stone-300 bg-transparent px-3 py-2 dark:border-stone-700" name="permit_no" required value="{{ old('permit_no', $eatery?->permit?->permit_no) }}">
                 </label>
                 <label class="space-y-1 text-sm font-medium">
                     <span>Expiry date</span>
-                    <input class="w-full rounded-lg border border-stone-300 bg-transparent px-3 py-2 dark:border-stone-700" type="date" name="expires_on" value="{{ old('expires_on', $eatery?->permit?->expires_on?->toDateString()) }}">
+                    <input class="w-full rounded-lg border border-stone-300 bg-transparent px-3 py-2 dark:border-stone-700" type="date" name="expires_on" required value="{{ old('expires_on', $eatery?->permit?->expires_on?->toDateString()) }}">
                 </label>
             </fieldset>
 

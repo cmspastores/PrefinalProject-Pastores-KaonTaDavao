@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\SaveReviewRequest;
+use App\Http\Requests\StoreReviewRequest;
 use App\Models\Eatery;
 use App\Models\Review;
 use Illuminate\Http\RedirectResponse;
 
 class ReviewController extends Controller
 {
-    public function store(SaveReviewRequest $request, Eatery $eatery): RedirectResponse
+    public function store(StoreReviewRequest $request, Eatery $eatery): RedirectResponse
     {
         $eatery->reviews()->create($request->validated());
 

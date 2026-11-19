@@ -3,7 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\FilterEateriesRequest;
-use App\Http\Requests\SaveEateryRequest;
+use App\Http\Requests\StoreEateryRequest;
+use App\Http\Requests\UpdateEateryRequest;
 use App\Models\District;
 use App\Models\Eatery;
 use App\Models\Feature;
@@ -14,13 +15,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class EateryController extends Controller
 {
     private const EATERY_ATTRIBUTES = [
         'district_id',
         'name',
-        'slug',
         'address',
         'price_range',
         'specialty',
@@ -78,12 +79,14 @@ class EateryController extends Controller
         ]);
     }
 
-    public function store(SaveEateryRequest $request): RedirectResponse
+    public function store(StoreEateryRequest $request): RedirectResponse
     {
         $validated = $request->validated();
 
         $eatery = DB::transaction(function () use ($validated): Eatery {
-            $eatery = Eatery::create(Arr::only($validated, self::EATERY_ATTRIBUTES));
+            $attributes = Arr::only($validated, self::EATERY_ATTRIBUTES);
+            $attributes['slug'] = $this->slugForName($validated['name']);
+            $eatery = Eatery::create($attributes);
             $this->syncFeaturesAndPermit($eatery, $validated);
 
             return $eatery;
@@ -125,13 +128,15 @@ class EateryController extends Controller
         ]);
     }
 
-    public function update(SaveEateryRequest $request, Eatery $eatery): RedirectResponse
+    public function update(UpdateEateryRequest $request, Eatery $eatery): RedirectResponse
     {
         $validated = $request->validated();
 
-        DB::transaction(function () use ($eatery, $validated, $request): void {
-            $eatery->update(Arr::only($validated, self::EATERY_ATTRIBUTES));
-            $this->syncFeaturesAndPermit($eatery, $validated, $request->isMethod('PUT'));
+        DB::transaction(function () use ($eatery, $validated): void {
+            $attributes = Arr::only($validated, self::EATERY_ATTRIBUTES);
+            $attributes['slug'] = $this->slugForName($validated['name'], $eatery->id);
+            $eatery->update($attributes);
+            $this->syncFeaturesAndPermit($eatery, $validated);
         });
 
         return redirect()
@@ -157,27 +162,28 @@ class EateryController extends Controller
     /**
      * @param  array<string, mixed>  $validated
      */
-    private function syncFeaturesAndPermit(Eatery $eatery, array $validated, bool $replace = true): void
+    private function syncFeaturesAndPermit(Eatery $eatery, array $validated): void
     {
-        if (array_key_exists('features', $validated)) {
-            $eatery->features()->sync($validated['features']);
-        } elseif ($replace) {
-            $eatery->features()->sync([]);
-        }
+        $eatery->features()->sync($validated['features']);
+        $eatery->permit()->updateOrCreate([], Arr::only($validated, ['permit_no', 'expires_on']));
+    }
 
-        $permitFieldsWereSubmitted = array_key_exists('permit_no', $validated)
-            || array_key_exists('expires_on', $validated);
+    private function slugForName(string $name, ?int $ignoreEateryId = null): string
+    {
+        $baseSlug = Str::slug($name) ?: 'eatery';
+        $suffix = 1;
 
-        if (! $permitFieldsWereSubmitted && ! $replace) {
-            return;
-        }
+        do {
+            $slug = $suffix === 1 ? $baseSlug : $baseSlug.'-'.$suffix;
+            $suffix++;
 
-        if (! empty($validated['permit_no']) && ! empty($validated['expires_on'])) {
-            $eatery->permit()->updateOrCreate([], Arr::only($validated, ['permit_no', 'expires_on']));
+            $query = Eatery::query()->where('slug', $slug);
 
-            return;
-        }
+            if ($ignoreEateryId !== null) {
+                $query->where('id', '!=', $ignoreEateryId);
+            }
+        } while ($query->exists());
 
-        $eatery->permit()->delete();
+        return $slug;
     }
 }

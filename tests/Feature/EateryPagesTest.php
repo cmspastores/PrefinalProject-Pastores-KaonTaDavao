@@ -232,6 +232,9 @@ it('creates and updates an eatery, its permit, and its selected features', funct
     $feature = Feature::create([
         'name' => 'Family friendly',
     ]);
+    $otherFeature = Feature::create([
+        'name' => 'Outdoor seating',
+    ]);
 
     $this->get(route('eateries.create'))
         ->assertOk()
@@ -241,13 +244,12 @@ it('creates and updates an eatery, its permit, and its selected features', funct
     $this->post(route('eateries.store'), [
         'district_id' => $district->id,
         'name' => 'Form Eatery',
-        'slug' => 'form-eatery',
         'address' => '15 Market Street',
         'price_range' => 'budget',
         'specialty' => '',
         'is_open' => '1',
-        'features' => [$feature->id],
-        'permit_no' => 'PERMIT-100',
+        'features' => [$feature->id, $otherFeature->id],
+        'permit_no' => 'DVO-2026-0100',
         'expires_on' => '2027-01-15',
     ])->assertRedirect(route('eateries.show', 'form-eatery'));
 
@@ -255,28 +257,43 @@ it('creates and updates an eatery, its permit, and its selected features', funct
 
     $this->assertDatabaseHas('permits', [
         'eatery_id' => $eatery->id,
-        'permit_no' => 'PERMIT-100',
+        'permit_no' => 'DVO-2026-0100',
     ]);
     $this->assertDatabaseHas('eatery_feature', [
         'eatery_id' => $eatery->id,
         'feature_id' => $feature->id,
     ]);
+    $this->assertDatabaseHas('eatery_feature', [
+        'eatery_id' => $eatery->id,
+        'feature_id' => $otherFeature->id,
+    ]);
 
     $this->get(route('eateries.edit', 'form-eatery'))
         ->assertOk()
-        ->assertSee('PERMIT-100')
+        ->assertSee('DVO-2026-0100')
         ->assertSee('name="_method" value="PUT"', false);
 
     $this->put(route('eateries.update', 'form-eatery'), [
         'district_id' => $district->id,
+        'name' => 'Form Eatery',
+        'address' => '15 Market Street',
+        'price_range' => 'budget',
+        'specialty' => '',
+        'is_open' => '1',
+        'features' => [$feature->id, $otherFeature->id],
+        'permit_no' => 'DVO-2026-0100',
+        'expires_on' => '2027-01-15',
+    ])->assertRedirect(route('eateries.show', 'form-eatery'));
+
+    $this->put(route('eateries.update', 'form-eatery'), [
+        'district_id' => $district->id,
         'name' => 'Updated Eatery',
-        'slug' => 'updated-eatery',
         'address' => '16 Market Street',
         'price_range' => 'splurge',
         'specialty' => 'Seafood',
         'is_open' => '0',
-        'features' => [],
-        'permit_no' => 'PERMIT-101',
+        'features' => [$feature->id],
+        'permit_no' => 'DVO-2026-0101',
         'expires_on' => '2028-01-15',
     ])->assertRedirect(route('eateries.show', 'updated-eatery'));
 
@@ -287,11 +304,11 @@ it('creates and updates an eatery, its permit, and its selected features', funct
     ]);
     $permit = Permit::query()->where('eatery_id', $eatery->id)->firstOrFail();
 
-    expect($permit->permit_no)->toBe('PERMIT-101')
+    expect($permit->permit_no)->toBe('DVO-2026-0101')
         ->and($permit->expires_on->toDateString())->toBe('2028-01-15');
     $this->assertDatabaseMissing('eatery_feature', [
         'eatery_id' => $eatery->id,
-        'feature_id' => $feature->id,
+        'feature_id' => $otherFeature->id,
     ]);
 });
 
@@ -299,25 +316,63 @@ it('shows custom validation messages and restores submitted values', function ()
     $district = District::create([
         'name' => 'Downtown',
     ]);
+    Feature::create([
+        'name' => 'Family friendly',
+    ]);
 
     $this->from(route('eateries.create'))
         ->followingRedirects()
         ->post(route('eateries.store'), [
             'district_id' => $district->id,
             'name' => 'Error Eatery',
-            'slug' => 'error-eatery',
             'address' => '15 Market Street',
             'price_range' => 'luxury',
             'specialty' => '',
             'is_open' => '1',
-            'permit_no' => 'PERMIT-ERROR',
+            'features' => [],
+            'permit_no' => 'BAD-PERMIT',
+            'expires_on' => '2026-01-01',
         ])
         ->assertOk()
         ->assertSee('Choose budget, mid, or splurge for the price range.')
-        ->assertSee('Enter an expiry date when a permit number is provided.')
+        ->assertSee('Pick at least one feature.')
+        ->assertSee('Permit number must look like DVO-2026-0415.')
+        ->assertSee('The permit must not be expired.')
         ->assertSee('value="Error Eatery"', false)
         ->assertSee('value="luxury"', false)
-        ->assertSee('value="PERMIT-ERROR"', false);
+        ->assertSee('value="BAD-PERMIT"', false);
+});
+
+it('rejects duplicate eatery names with the requested message', function () {
+    $district = District::create([
+        'name' => 'Downtown',
+    ]);
+    $feature = Feature::create([
+        'name' => 'Family friendly',
+    ]);
+    $district->eateries()->create([
+        'name' => 'Duplicate Eatery',
+        'slug' => 'duplicate-eatery',
+        'address' => '1 Market Street',
+        'price_range' => 'budget',
+    ]);
+
+    $this->from(route('eateries.create'))
+        ->post(route('eateries.store'), [
+            'name' => 'Duplicate Eatery',
+            'district_id' => $district->id,
+            'address' => '2 Market Street',
+            'price_range' => 'budget',
+            'specialty' => '',
+            'is_open' => '1',
+            'features' => [$feature->id],
+            'permit_no' => 'DVO-2026-0301',
+            'expires_on' => '2027-03-01',
+        ])
+        ->assertRedirect(route('eateries.create'))
+        ->assertSessionHasErrors([
+            'name' => 'Kaon Ta Pastores already lists an eatery with this name.',
+        ]);
 });
 
 it('validates the feature filter using its form request', function () {
@@ -460,7 +515,53 @@ it('binds eateries by slug and stores and deletes reviews through named routes',
     ]);
 });
 
-it('supports partial eatery updates without replacing omitted relationships', function () {
+it('validates reviews with the requested messages and forbids reviews for closed eateries', function () {
+    $district = District::create([
+        'name' => 'Downtown',
+    ]);
+    $openEatery = $district->eateries()->create([
+        'name' => 'Open Eatery',
+        'slug' => 'open-eatery',
+        'address' => '1 Market Street',
+        'price_range' => 'budget',
+    ]);
+    $closedEatery = $district->eateries()->create([
+        'name' => 'Closed Eatery',
+        'slug' => 'closed-eatery',
+        'address' => '2 Market Street',
+        'price_range' => 'budget',
+        'is_open' => false,
+    ]);
+    $reviewer = User::create([
+        'name' => 'Pat Reviewer',
+        'email' => 'pat@example.com',
+        'password' => 'password',
+    ]);
+
+    $this->from(route('eateries.show', $openEatery))
+        ->post(route('eateries.reviews.store', $openEatery), [
+            'rating' => 0,
+            'body' => 'short',
+        ])
+        ->assertRedirect(route('eateries.show', $openEatery))
+        ->assertSessionHasErrors([
+            'user_id' => 'Choose who is writing this review.',
+            'rating' => 'Ratings go from 1 to 5 stars only.',
+            'body' => 'Kaon Ta Pastores: reviews need at least 10 characters.',
+        ]);
+
+    $this->post(route('eateries.reviews.store', $closedEatery), [
+        'user_id' => $reviewer->id,
+        'rating' => 5,
+        'body' => 'This review should not be saved.',
+    ])->assertForbidden();
+
+    $this->assertDatabaseMissing('reviews', [
+        'eatery_id' => $closedEatery->id,
+    ]);
+});
+
+it('requires complete eatery details when updating', function () {
     $district = District::create([
         'name' => 'Downtown',
     ]);
@@ -480,13 +581,23 @@ it('supports partial eatery updates without replacing omitted relationships', fu
         'expires_on' => '2027-01-15',
     ]);
 
-    $this->patch(route('eateries.update', $eatery), [
-        'name' => 'Harbor Kitchen Updated',
-    ])->assertRedirect(route('eateries.show', $eatery));
+    $this->from(route('eateries.edit', $eatery))
+        ->patch(route('eateries.update', $eatery), [
+            'name' => 'Harbor Kitchen Updated',
+        ])
+        ->assertRedirect(route('eateries.edit', $eatery))
+        ->assertSessionHasErrors([
+            'district_id',
+            'address',
+            'price_range',
+            'features',
+            'permit_no',
+            'expires_on',
+        ]);
 
     $this->assertDatabaseHas('eateries', [
         'id' => $eatery->id,
-        'name' => 'Harbor Kitchen Updated',
+        'name' => 'Harbor Kitchen',
         'specialty' => 'Seafood',
     ]);
     $this->assertDatabaseHas('eatery_feature', [
