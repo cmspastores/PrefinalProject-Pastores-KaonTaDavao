@@ -63,7 +63,7 @@ it('renders eager-loaded relationship names and aggregates on browse pages', fun
     Model::preventLazyLoading(true);
 
     try {
-        $this->get(route('eateries.index', ['feature' => $feature->id]))
+        $this->get(route('eateries.index', ['feature' => $feature->name]))
             ->assertOk()
             ->assertSee('Harbor Kitchen')
             ->assertDontSee('Northside Cafe')
@@ -102,6 +102,64 @@ it('renders eager-loaded relationship names and aggregates on browse pages', fun
     } finally {
         Model::preventLazyLoading($wasPreventingLazyLoading);
     }
+});
+
+it('shows home totals and the three highest-rated reviewed eateries', function () {
+    $centralDistrict = District::create([
+        'name' => 'Central',
+    ]);
+    $northDistrict = District::create([
+        'name' => 'North',
+    ]);
+    $topEatery = $centralDistrict->eateries()->create([
+        'name' => 'Top Table',
+        'slug' => 'top-table',
+        'address' => '1 Main Street',
+        'price_range' => 'mid',
+    ]);
+    $secondEatery = $centralDistrict->eateries()->create([
+        'name' => 'Second Spoon',
+        'slug' => 'second-spoon',
+        'address' => '2 Main Street',
+        'price_range' => 'mid',
+    ]);
+    $thirdEatery = $northDistrict->eateries()->create([
+        'name' => 'Third Plate',
+        'slug' => 'third-plate',
+        'address' => '3 Main Street',
+        'price_range' => 'budget',
+    ]);
+    $unratedEatery = $northDistrict->eateries()->create([
+        'name' => 'Unrated Eatery',
+        'slug' => 'unrated-eatery',
+        'address' => '4 Main Street',
+        'price_range' => 'budget',
+    ]);
+    $reviewer = User::create([
+        'name' => 'Rating Reviewer',
+        'email' => 'rating@example.com',
+        'password' => 'password',
+    ]);
+
+    $topEatery->reviews()->create(['user_id' => $reviewer->id, 'rating' => 5, 'body' => 'Excellent.']);
+    $secondEatery->reviews()->create(['user_id' => $reviewer->id, 'rating' => 4, 'body' => 'Very good.']);
+    $thirdEatery->reviews()->create(['user_id' => $reviewer->id, 'rating' => 3, 'body' => 'Good.']);
+
+    $response = $this->get(route('home'))->assertOk();
+
+    $response->assertViewHas('eateryCount', 4)
+        ->assertViewHas('districtCount', 2)
+        ->assertViewHas('reviewCount', 3)
+        ->assertSee('Top Rated')
+        ->assertSee('Top Table')
+        ->assertSee('Second Spoon')
+        ->assertSee('Third Plate')
+        ->assertDontSee($unratedEatery->name);
+
+    $content = $response->getContent();
+
+    expect(strpos($content, 'Top Table'))->toBeLessThan(strpos($content, 'Second Spoon'))
+        ->and(strpos($content, 'Second Spoon'))->toBeLessThan(strpos($content, 'Third Plate'));
 });
 
 it('creates and updates an eatery, its permit, and its selected features', function () {
@@ -201,11 +259,90 @@ it('shows custom validation messages and restores submitted values', function ()
 
 it('validates the feature filter using its form request', function () {
     $this->from(route('eateries.index'))
-        ->get(route('eateries.index', ['feature' => 'invalid']))
+        ->get(route('eateries.index', ['feature' => 'not-a-feature']))
         ->assertRedirect(route('eateries.index'))
         ->assertSessionHasErrors([
-            'feature' => 'Choose a whole-number feature ID.',
+            'feature' => 'The selected feature could not be found.',
         ]);
+});
+
+it('combines eatery filters and keeps them in six-item pagination links', function () {
+    $district = District::create([
+        'name' => 'Central',
+    ]);
+    $otherDistrict = District::create([
+        'name' => 'North',
+    ]);
+    $feature = Feature::create([
+        'name' => 'Patio seating',
+    ]);
+    $otherFeature = Feature::create([
+        'name' => 'Delivery',
+    ]);
+
+    for ($index = 1; $index <= 6; $index++) {
+        $eatery = $district->eateries()->create([
+            'name' => sprintf('Udon House %02d', $index),
+            'slug' => sprintf('udon-house-%02d', $index),
+            'address' => '1 Main Street',
+            'price_range' => 'mid',
+        ]);
+        $eatery->features()->attach($feature);
+    }
+
+    $specialtyMatch = $district->eateries()->create([
+        'name' => 'West End Grill',
+        'slug' => 'west-end-grill',
+        'address' => '7 Main Street',
+        'price_range' => 'mid',
+        'specialty' => 'Udon noodles',
+    ]);
+    $specialtyMatch->features()->attach($feature);
+
+    $districtMismatch = $otherDistrict->eateries()->create([
+        'name' => 'Outer District Cafe',
+        'slug' => 'outer-district-cafe',
+        'address' => '8 North Street',
+        'price_range' => 'budget',
+        'specialty' => 'Udon noodles',
+    ]);
+    $districtMismatch->features()->attach($feature);
+
+    $featureMismatch = $district->eateries()->create([
+        'name' => 'No Patio Cafe',
+        'slug' => 'no-patio-cafe',
+        'address' => '9 Main Street',
+        'price_range' => 'budget',
+        'specialty' => 'Udon noodles',
+    ]);
+    $featureMismatch->features()->attach($otherFeature);
+
+    $filters = [
+        'q' => 'Udon',
+        'district' => $district->id,
+        'feature' => $feature->name,
+    ];
+
+    $this->get(route('eateries.index', $filters))
+        ->assertOk()
+        ->assertSee('Udon House 01')
+        ->assertSee('Udon House 06')
+        ->assertDontSee('West End Grill')
+        ->assertDontSee('Outer District Cafe')
+        ->assertDontSee('No Patio Cafe')
+        ->assertSee('name="q" value="Udon"', false)
+        ->assertSee('value="'.$district->id.'" selected', false)
+        ->assertSee('value="'.$feature->name.'" selected', false)
+        ->assertSee(route('eateries.index', $filters + ['page' => 2]));
+
+    $this->get(route('eateries.index', $filters + ['page' => 2]))
+        ->assertOk()
+        ->assertSee('West End Grill')
+        ->assertDontSee('Udon House 01');
+
+    $this->get(route('eateries.index', ['q' => 'nothing-matches']))
+        ->assertOk()
+        ->assertSee('No eateries match your filters.');
 });
 
 it('binds eateries by slug and stores and deletes reviews through named routes', function () {
